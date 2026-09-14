@@ -16,6 +16,9 @@ export interface Section4Props {
   titleClassName?: string;
   descriptionClassName?: string;
   taglineClassName?: string;
+  mobTitleClassName?: string;
+  mobDescriptionClassName?: string;
+  mobTaglineClassName?: string;
 }
 
 export default function Section4({
@@ -36,6 +39,9 @@ export default function Section4({
   titleClassName = "",
   descriptionClassName = "",
   taglineClassName = "",
+  mobTitleClassName = "",
+  mobDescriptionClassName = "",
+  mobTaglineClassName = "",
 }: Section4Props) {
   return (
     <>
@@ -102,12 +108,12 @@ export default function Section4({
       <img src={backgroundImage} alt="" className="md:hidden w-full h-auto object-cover" />
 
       <div className="flex flex-col gap-2 items-center justify-center text-center px-10 py-10" >
-        <h2 className="text-[24px] md:text-[32px] mb-2 ">{mobTitle}</h2>
-        <p className="text-[16px] md:text-[20px] text-center w-xs">{mobDescription}.</p>
+        <h2 className={`mb-2 ${mobTitleClassName || "text-[24px] md:text-[32px]"}`}>{mobTitle}</h2>
+        <p className={`text-center w-xs ${mobDescriptionClassName || "text-[16px] md:text-[20px]"}`}>{mobDescription}.</p>
 
         <div className="w-[52px] h-px bg-primary-dark my-4"/>
 
-        <h2 className="text-[24px] md:text-[28px]">
+        <h2 className={mobTaglineClassName || "text-[24px] md:text-[28px]"}>
           <em>{tagline}</em> 
         </h2>
       </div>

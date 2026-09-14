@@ -20,6 +20,8 @@ interface HeroSectionProps {
     textColor?: string;
     twoLinks?: React.ReactNode;
     desktopTextClassName?: string;
+    mobileTextClassName?: string;
+    titleClassName?: string;
 }
 
 const HeroSection = ({
@@ -39,6 +41,8 @@ const HeroSection = ({
     textColor = "text-white",
     twoLinks = <></>,
     desktopTextClassName = "",
+    mobileTextClassName = "",
+    titleClassName = "",
 }: HeroSectionProps) => {
     const { scrollY } = useScroll();
     const heroY = useTransform(scrollY, [0, 500], [0, 180]);
@@ -111,11 +115,11 @@ const HeroSection = ({
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ duration: 1 }}
                         >
-                            <h1 className={`text-[28px] md:text-[48px] text-center uppercase ${mobileTitle ? "hidden md:block" : ""}`}>
+                            <h1 className={`${titleClassName || "text-[28px] md:text-[48px]"} text-center uppercase ${mobileTitle ? "hidden md:block" : ""}`}>
                                 {title}
                             </h1>
                             {mobileTitle && (
-                                <h1 className="md:hidden text-[28px] md:text-[48px] text-center uppercase">
+                                <h1 className={`md:hidden ${titleClassName || "text-[28px] md:text-[48px]"} text-center uppercase`}>
                                     {mobileTitle}
                                 </h1>
                             )}
@@ -136,7 +140,7 @@ const HeroSection = ({
                                 {desktopText}
                             </div>
 
-                            <div className="md:hidden text-[16px] text-center">
+                            <div className={`md:hidden ${mobileTextClassName || "text-[16px]"} text-center`}>
                                 {mobileText || desktopText}
                             </div>
                         </motion.div>

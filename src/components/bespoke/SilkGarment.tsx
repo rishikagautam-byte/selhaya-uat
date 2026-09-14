@@ -70,10 +70,12 @@ export default function SilkGarment() {
   return (
     <>
       <HeroSection image={Hero} title="SELHAYA Bespoke Garments"
+        titleClassName="text-[26px] md:text-[46px]"
         desktopText=<>
          Every commission is conceived privately and crafted in pure silk for special occasions with  <br />the quiet artistry of the House.
         </>
         desktopTextClassName="text-[14px]"
+        mobileTextClassName="text-[14px]"
         mobileText="Every commission is conceived privately and crafted in pure silk, with the quiet artistry of the House."
         buttonText="Begin a Private Enquiry"
         onButtonClick={scrollToEnquiry}
@@ -113,6 +115,9 @@ export default function SilkGarment() {
         titleClassName="text-[24px] md:text-[30px]"
         descriptionClassName="text-[12px] md:text-[14px]"
         taglineClassName="text-[20px] md:text-[26px]"
+        mobTitleClassName="text-[22px]"
+        mobDescriptionClassName="text-[14px]"
+        mobTaglineClassName="text-[22px]"
         title="THE MAKING OF A SINGULAR PIECE"
         mobTitle={
           <>

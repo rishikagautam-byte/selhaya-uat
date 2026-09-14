@@ -123,16 +123,16 @@ export const navItems = [
     label: "Selhaya Bespoke",
     nestedMenu: [
       {
-        title: "Bespoke Silk Art",
-        image: "/images/navbar/bespoke/art.png",
-        href: "/bespoke/silk-art",
-      },
-      {
         title: "Bespoke Silk Garments",
         image: "/images/navbar/bespoke/garment.png",
         href: "/bespoke/silk-garment",
+      },
+      {
+        title: "Bespoke Silk Art",
+        image: "/images/navbar/bespoke/art.png",
+        href: "/bespoke/silk-art",
       }
-    ],
+    ]
   },
   
   // our journey 

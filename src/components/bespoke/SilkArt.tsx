@@ -49,11 +49,13 @@ export default function SilkArt() {
     <>
       <HeroSection image={Hero} title="SELHAYA Bespoke Silk Art"
         mobileTitle=<>Selhaya bespoke <br />silk art</>
+        titleClassName="text-[24px] md:text-[44px]"
         desktopText=<>
           Created for collectors, institutions, and those who wish to preserve stories through silk, <br />
           craftsmanship, and cultural artistry.
         </>
         desktopTextClassName="text-[12px]"
+        mobileTextClassName="text-[12px]"
         mobileText="Created for collectors, institutions, and those who wish to preserve stories through silk, craftsmanship, and cultural artistry."
         buttonText="Begin a Private Enquiry"
         onButtonClick={scrollToEnquiry}
@@ -99,6 +101,9 @@ export default function SilkArt() {
         titleClassName="text-[22px] md:text-[28px]"
         descriptionClassName="text-[10px] md:text-[12px]"
         taglineClassName="text-[18px] md:text-[24px]"
+        mobTitleClassName="text-[20px]"
+        mobDescriptionClassName="text-[12px]"
+        mobTaglineClassName="text-[20px]"
         title={
           <>
             Created through craftsmanship. <br />
