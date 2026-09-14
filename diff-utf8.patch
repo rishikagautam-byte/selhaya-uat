@@ -1,0 +1,1473 @@
+﻿diff --git a/src/components/Footer.tsx b/src/components/Footer.tsx
+index 45d462b..a237794 100644
+--- a/src/components/Footer.tsx
++++ b/src/components/Footer.tsx
+@@ -97,7 +97,7 @@ export default function Footer() {
+               <p className="  font-editorial text-[20px] font-normal text-[#281B13] tracking-[0.02em] leading-[25px] m-0 mb-4">Maison Selhaya</p>
+               <ul className="flex flex-col gap-2.5">
+                 {[
+-                  { name: "Selhaya  Edition", path: "/selhaya-edition" },
++                  { name: "Selhaya  Edition", path: "/selhaya-collections" },
+                   { name: "Maison", path: "/the-house-of-selhaya" },
+                   { name: "Heritage", path: "/heritage" },
+                   { name: "Journal", path: "/journal" },
+@@ -174,7 +174,7 @@ export default function Footer() {
+               <p className="  font-editorial text-[20px] font-normal text-[#281B13] tracking-[0.02em] leading-[25px] m-0 mb-[18px]">Maison Selhaya</p>
+               <ul className="flex flex-col gap-2.5">
+                 {[
+-                  { name: "Selhaya  Edition", path: "/selhaya-edition" },
++                  { name: "Selhaya  Edition", path: "/selhaya-collections" },
+                   { name: "Maison", path: "/the-house-of-selhaya" },
+                   { name: "Heritage", path: "/selhaya-collections/heritiage" },
+                   { name: "Journal", path: "/journal" },
+diff --git a/src/context/CartContext.tsx b/src/context/CartContext.tsx
+index f93ad60..9af5296 100644
+--- a/src/context/CartContext.tsx
++++ b/src/context/CartContext.tsx
+@@ -10,6 +10,7 @@ export type CartItem = {
+   size?: string;
+   height?: string;
+   heightUnit?: string;
++  variantId?: string;
+ };
+ 
+ type CartContextValue = {
+diff --git a/src/context/UserContext.tsx b/src/context/UserContext.tsx
+index 1d5bab7..4a357d9 100644
+--- a/src/context/UserContext.tsx
++++ b/src/context/UserContext.tsx
+@@ -64,6 +64,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
+               email: email,
+               phoneNumber: customer.phone || MOCK_PERSONAL_DATA.phoneNumber,
+               addresses: [],
++              orders: [],
+             };
+             
+             setUser({
+@@ -104,6 +105,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
+         email: customer.email,
+         phoneNumber: customer.phone || "",
+         addresses: [],
++        orders: [],
+       };
+       
+       // Save to localStorage
+@@ -140,6 +142,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
+         email,
+         phoneNumber: "",
+         addresses: [],
++        orders: [],
+       };
+       
+       // Save to localStorage
+@@ -185,6 +188,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
+           email: customer.email,
+           phoneNumber: customer.phone || "",
+           addresses: [],
++          orders: [],
+         };
+         
+         saveUserToStorage(customer.email, profileData);
+@@ -223,6 +227,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
+         email: updated.email,
+         phoneNumber: updated.phoneNumber,
+         addresses: updated.addresses,
++        orders: updated.orders || [],
+       });
+       
+       return updated;
+diff --git a/src/data/shopifyAdmin.ts b/src/data/shopifyAdmin.ts
+index c37d31f..32fd01b 100644
+--- a/src/data/shopifyAdmin.ts
++++ b/src/data/shopifyAdmin.ts
+@@ -15,6 +15,7 @@ export interface ShopifyLineItem {
+   height?: string;
+   heightUnit?: string;
+   image?: string;
++  variantId?: string;
+ }
+ 
+ export interface ShopifyAddress {
+@@ -67,9 +68,10 @@ export async function createShopifyOrder(
+         return {
+           title: item.title,
+           quantity: item.quantity,
+-          price: "0.00", // Testing mode ΓÇö ┬ú0.00 until payment gateway is integrated
++          price: item.price,
+           requires_shipping: true,
+           properties,
++          ...(item.variantId ? { variant_id: Number(item.variantId) } : {}),
+         };
+       }),
+       shipping_address: payload.shippingAddress,
+diff --git a/src/features/cartPage/Cart.tsx b/src/features/cartPage/Cart.tsx
+index 13960ef..5466f4d 100644
+--- a/src/features/cartPage/Cart.tsx
++++ b/src/features/cartPage/Cart.tsx
+@@ -4,7 +4,10 @@ import { useEffect, useState } from "react";
+ import { useNavigate } from "react-router-dom";
+ import { useCart } from "../../context/CartContext";
+ import { useFavorites } from "../../context/FavoritesContext";
+-import { allProducts } from "../../lib/productImages";
++import { useUser } from "../../context/UserContext";
++import { allProducts, productBySlug } from "../../lib/productImages";
++import { fetchShopifyProducts, createShopifyCheckout, fetchShopifyProductByHandle } from "../../lib/shopify";
++import { getProductURLsCache } from "../../lib/productURLHelper";
+ 
+ interface CartItem {
+   id: string;
+@@ -24,6 +27,7 @@ interface RecommendedItem {
+   name: string;
+   price: number;
+   image: string;
++  shopifyGid?: string; // full GID e.g. gid://shopify/Product/12345
+ }
+ 
+ interface CartProps {
+@@ -47,7 +51,7 @@ const defaultRecommended: RecommendedItem[] = allProducts
+ const parsePrice = (price: string) => Number(price.replace(/[^0-9.]/g, "")) || 0;
+ 
+ const formatPrice = (price: number) =>
+-  `$${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
++  `┬ú ${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+ 
+ const formatHeight = (heightVal?: string, unit?: string) => {
+   if (!heightVal) return null;
+@@ -181,29 +185,84 @@ function CartInner({
+   mobile?: boolean;
+ }) {
+   const navigate = useNavigate();
++  const { user } = useUser();
+   const { favorites } = useFavorites();
+   const [dynamicRecommended, setDynamicRecommended] = useState<RecommendedItem[]>([]);
+   const px = mobile ? "px-5" : "px-6";
+   const dividerColor = "border-[#E7E1DA]";
+ 
+   useEffect(() => {
+-    // Get pink collection items and shuffle them
+-    const pinkItems = allProducts
+-      .filter((p) => p.collection === "PINK COLLECTION")
+-      .map((p) => ({
+-        id: p.slug,
+-        collection: p.collection,
+-        name: p.name,
+-        price: Number(p.price.replace(/[^0-9.]/g, "")) || 4800,
+-        image: p.image,
+-      }));
+-    const shuffled = [...pinkItems].sort(() => 0.5 - Math.random());
+-    setDynamicRecommended(shuffled.slice(0, 3));
++    async function loadShopifyRecommendations() {
++      try {
++        const products = await fetchShopifyProducts(20);
++        
++        const mapped: RecommendedItem[] = products.map((p) => {
++           const numPrice = Number(p.price.replace(/[^0-9.]/g, "")) || 0;
++           // Local map for product handle to local ID if needed, 
++           // but handle works fine for id since addToCart uses id=slug
++           const localToShopify: Record<string, string> = {
++             "the-ziya-blue": "ziya-blue", "the-yaqeen-abaya": "yaqeen",
++             "the-sharifa-cut": "sharifa-cut", "the-safa-wrap": "safa-bloom",
++             "the-sakura": "sakura", "the-sabi": "sabi",
++           };
++           const localHandle = localToShopify[p.handle] || p.handle;
++
++           return {
++             id: localHandle,
++             collection: p.vendor || "SELHAYA",
++             name: p.title,
++             price: numPrice,
++             image: p.images[0]?.url || "",
++             shopifyGid: p.id,
++           };
++        });
++
++        // Group by collection to ensure diversity
++        const byCollection: Record<string, RecommendedItem[]> = {};
++        mapped.forEach((item) => {
++          const col = item.collection || "OTHER";
++          if (!byCollection[col]) byCollection[col] = [];
++          byCollection[col].push(item);
++        });
++
++        const diverseList: RecommendedItem[] = [];
++        const collections = Object.keys(byCollection);
++        let added = true;
++        while (added) {
++          added = false;
++          for (const col of collections) {
++            if (byCollection[col].length > 0) {
++              diverseList.push(byCollection[col].shift()!);
++              added = true;
++            }
++          }
++        }
++        
++        setDynamicRecommended(diverseList);
++      } catch (error) {
++        console.error("Failed to load recommendations:", error);
++      }
++    }
++    loadShopifyRecommendations();
+   }, []);
+ 
+-  const handleCartItemClick = (item: CartItem) => {
++  const cartIds = new Set(cartItems.map((item) => item.id));
++  const availableFavorites = favorites.filter((fav) => !cartIds.has(fav.slug));
++  const availableRecommended = dynamicRecommended.filter((rec) => !cartIds.has(rec.id));
++
++  const handleCartItemClick = async (item: CartItem) => {
+     onClose();
+-    navigate("/cart", { state: { selectedItemId: item.id } });
++    try {
++      const urls = await getProductURLsCache();
++      const match = urls.find((u) => u.handle === item.id);
++      if (match) {
++        navigate(match.url);
++      } else {
++        navigate(`/products/${item.id}`);
++      }
++    } catch {
++      navigate(`/products/${item.id}`);
++    }
+   };
+ 
+   return (
+@@ -281,7 +340,7 @@ function CartInner({
+           className="text-[14px] font-medium text-[#281B13]"
+           style={{ fontFamily: "'DM Sans', sans-serif" }}
+         >
+-          {`$${subtotal.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
++          {formatPrice(subtotal)}
+         </span>
+       </div>
+ 
+@@ -308,40 +367,36 @@ function CartInner({
+           </button>
+         </div>
+ 
+-        {/* Favorites or Recommended Items */}
+-        {favorites.length > 0 ? (
+-          favorites.slice(0, 3).map((fav) => (
+-            <RecommendedRow key={fav.slug} rec={{ id: fav.slug, name: fav.name, image: fav.image, price: parseInt(fav.price.replace(/\D/g, '') || "4700"), collection: fav.collection }} onAdd={onAddToCart} />
+-          ))
+-        ) : (
+-          dynamicRecommended.length > 0 ? dynamicRecommended.map((rec) => (
+-            <RecommendedRow key={rec.id} rec={rec} onAdd={onAddToCart} />
+-          )) : recommendedItems.map((rec) => (
+-            <RecommendedRow key={rec.id} rec={rec} onAdd={onAddToCart} />
+-          ))
+-        )}
++        {/* Recommended Items */}
++        {availableRecommended.length > 0 ? availableRecommended.slice(0, 3).map((rec) => (
++          <RecommendedRow
++            key={rec.id}
++            rec={rec}
++            onAdd={onAddToCart}
++            onNavigate={(r) => {
++              onClose();
++              if (r.shopifyGid) {
++                navigate(`/products/${r.id}/${encodeURIComponent(r.shopifyGid)}`);
++              } else {
++                navigate(`/products/${r.id}`);
++              }
++            }}
++          />
++        )) : recommendedItems.filter(r => !cartIds.has(r.id)).slice(0, 3).map((rec) => (
++          <RecommendedRow
++            key={rec.id}
++            rec={rec}
++            onAdd={onAddToCart}
++            onNavigate={(r) => {
++              onClose();
++              navigate(`/products/${r.id}`);
++            }}
++          />
++        ))}
+       </div>
+ 
+       {/* ΓöÇΓöÇ Checkout CTA ΓöÇΓöÇ */}
+-      <div className={`${px} mt-6`}>
+-        <button
+-          type="button"
+-          onClick={() => {
+-            onClose();
+-            // Generate a fake Shopify-like checkout token for the local URL
+-            const randomToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+-            navigate(`/checkouts/cn/${randomToken}/en`);
+-          }}
+-          className="
+-            w-full bg-[#8B7355] hover:bg-[#7A6347] active:bg-[#6B5540]
+-            text-white text-[14px] tracking-widest uppercase
+-            py-4 transition-colors duration-200
+-          "
+-          style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.12em" }}
+-        >
+-          Checkout
+-        </button>
+-      </div>
++      <CheckoutButton cartItems={cartItems} onClose={onClose} px={px} />
+ 
+       {/* ΓöÇΓöÇ Footer Links ΓöÇΓöÇ */}
+       <div className={`${px} mt-4 mb-6 flex items-center gap-1 flex-wrap`}>
+@@ -405,14 +460,16 @@ function CartItemRow({
+ 
+   const handleSaveForLater = (e: React.MouseEvent) => {
+     e.stopPropagation();
++    // Look up extra product info from the master registry
++    const registryEntry = productBySlug[item.id];
+     addFavorite({
+       slug: item.id,
+       name: item.name,
+-      image: item.image,
++      image: item.image || registryEntry?.image || "",
+       price: item.price,
+-      collection: "SELHAYA", // fallback
++      collection: registryEntry?.collection || "SELHAYA",
+     });
+-    removeFromCart(item.id);
++    // Item stays in cart ΓÇö only saved to favorites
+   };
+ 
+   return (
+@@ -422,13 +479,14 @@ function CartItemRow({
+         <div
+           onClick={onClick}
+           className="flex-shrink-0 bg-[#EDE7DE] overflow-hidden cursor-pointer"
+-          style={{ width: 65, height: 100 }}
++          style={{ width: 90, height: 120 }}
+         >
+           {/* eslint-disable-next-line @next/next/no-img-element */}
+           <img
+             src={item.image}
+             alt={item.name}
+             className="w-full h-full object-cover"
++            style={{ imageRendering: "auto" }}
+             onError={(e) => {
+               (e.currentTarget as HTMLImageElement).style.display = "none";
+             }}
+@@ -526,38 +584,43 @@ function CartItemRow({
+   );
+ }
+ 
+-/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+-   Recommended Item Row
+-ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+ function RecommendedRow({
+   rec,
+   onAdd,
++  onNavigate,
+ }: {
+   rec: RecommendedItem;
+   onAdd: (rec: RecommendedItem) => void;
++  onNavigate?: (rec: RecommendedItem) => void;
+ }) {
++  const handleClick = () => {
++    if (onNavigate) onNavigate(rec);
++  };
++
+   return (
+     <div className="flex items-center gap-3 bg-[#F0EAE1] px-3 py-3 mb-3">
+-      {/* Image */}
++      {/* Image ΓÇö clickable */}
+       <div
+-        className="flex-shrink-0 bg-[#EDE7DE] overflow-hidden"
+-        style={{ width: 56, height: 72 }}
++        className="flex-shrink-0 bg-[#EDE7DE] overflow-hidden cursor-pointer"
++        style={{ width: 72, height: 92 }}
++        onClick={handleClick}
+       >
+         {/* eslint-disable-next-line @next/next/no-img-element */}
+         <img
+           src={rec.image}
+           alt={rec.name}
+-          width={56}
+-          height={72}
++          width={72}
++          height={92}
+           className="w-full h-full object-cover"
++          style={{ imageRendering: "auto" }}
+           onError={(e) => {
+             (e.currentTarget as HTMLImageElement).style.display = "none";
+           }}
+         />
+       </div>
+ 
+-      {/* Text */}
+-      <div className="flex-1 min-w-0">
++      {/* Text ΓÇö clickable */}
++      <div className="flex-1 min-w-0 cursor-pointer" onClick={handleClick}>
+         <p
+           className="text-[11px] text-[#8A7A6E]"
+           style={{ fontFamily: "'DM Sans', sans-serif" }}
+@@ -565,7 +628,7 @@ function RecommendedRow({
+           {rec.collection}
+         </p>
+         <p
+-          className="text-[14px] text-[#281B13] mt-0.5"
++          className="text-[14px] text-[#281B13] mt-0.5 hover:opacity-70 transition-opacity"
+           style={{ fontFamily: "'DM Sans', sans-serif" }}
+         >
+           {rec.name}
+@@ -578,7 +641,7 @@ function RecommendedRow({
+           className="text-[13px] text-[#281B13]"
+           style={{ fontFamily: "'DM Sans', sans-serif" }}
+         >
+-          {`$${rec.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
++          {`┬ú ${rec.price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`}
+         </span>
+         <button
+           onClick={() => onAdd(rec)}
+@@ -590,4 +653,175 @@ function RecommendedRow({
+       </div>
+     </div>
+   );
++}
++
++/* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
++   Checkout Button ΓÇö creates real Shopify checkout URL
++ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
++
++// Handle mapping: local slug ΓåÆ Shopify handle
++const LOCAL_TO_SHOPIFY_HANDLE: Record<string, string> = {
++  "ziya-blue": "the-ziya-blue",
++  "yaqeen": "the-yaqeen-abaya",
++  "sharifa-cut": "the-sharifa-cut",
++  "safa-bloom": "the-safa-wrap",
++  "sakura": "the-sakura",
++  "sabi": "the-sabi",
++};
++
++function CheckoutButton({
++  cartItems,
++  onClose,
++  px,
++}: {
++  cartItems: CartItem[];
++  onClose: () => void;
++  px: string;
++}) {
++  const [isLoading, setIsLoading] = useState(false);
++  const [checkoutError, setCheckoutError] = useState<string | null>(null);
++
++  const handleCheckout = async () => {
++    if (cartItems.length === 0) return;
++
++    // ΓöÇΓöÇ Open a blank tab IMMEDIATELY (synchronous, same tick as click)
++    // This bypasses the browser popup blocker. If called after an async
++    // operation, most browsers silently block the new tab.
++    const newTab = window.open("", "_blank");
++    if (newTab) {
++      newTab.document.write(
++        `<html><head><title>Preparing CheckoutΓÇª</title>
++         <style>body{margin:0;display:flex;align-items:center;justify-content:center;
++         min-height:100vh;font-family:'DM Sans',sans-serif;background:#F9F4EE;color:#281B13;}
++         .loader{text-align:center;}.dot{display:inline-block;width:8px;height:8px;
++         border-radius:50%;background:#8B7355;margin:0 4px;
++         animation:bounce 1.2s infinite ease-in-out;}.dot:nth-child(2){animation-delay:.2s;}
++         .dot:nth-child(3){animation-delay:.4s;}
++         @keyframes bounce{0%,80%,100%{transform:scale(0);}40%{transform:scale(1);}}</style>
++         </head><body><div class="loader">
++         <p style="font-size:15px;letter-spacing:.1em;margin-bottom:16px;">Preparing your checkout</p>
++         <span class="dot"></span><span class="dot"></span><span class="dot"></span>
++         </div></body></html>`
++      );
++    }
++
++    setIsLoading(true);
++    setCheckoutError(null);
++
++    try {
++      // Step 1: Resolve variantIds for all cart items
++      const itemsWithVariants = await Promise.all(
++        cartItems.map(async (item) => {
++          if (item.variantId) {
++            const fullGid = item.variantId.startsWith("gid://")
++              ? item.variantId
++              : `gid://shopify/ProductVariant/${item.variantId}`;
++            return { variantId: fullGid, quantity: item.quantity };
++          }
++          try {
++            const shopifyHandle = LOCAL_TO_SHOPIFY_HANDLE[item.id] || item.id;
++            const product = await fetchShopifyProductByHandle(shopifyHandle);
++            if (product?.variants && product.variants.length > 0) {
++              const matchedVariant =
++                product.variants.find((v) =>
++                  v.title.toLowerCase().includes((item.size || "M").toLowerCase())
++                ) || product.variants[0];
++              return { variantId: matchedVariant.id, quantity: item.quantity };
++            }
++          } catch {
++            // ignore individual fetch errors
++          }
++          return null;
++        })
++      );
++
++      const validLineItems = itemsWithVariants.filter(
++        (x): x is { variantId: string; quantity: number } => x !== null
++      );
++
++      if (validLineItems.length === 0) {
++        if (newTab) newTab.close();
++        setCheckoutError("Could not resolve products. Please try again.");
++        return;
++      }
++
++      // Step 2: Create Shopify cart ΓåÆ get checkout URL
++      const shopifyCheckoutUrl = await createShopifyCheckout(validLineItems);
++
++      if (!shopifyCheckoutUrl) {
++        if (newTab) newTab.close();
++        setCheckoutError("Could not connect to checkout. Please try again.");
++        return;
++      }
++
++      // Step 3: Redirect the already-open tab to the Shopify checkout
++      onClose();
++      if (newTab) {
++        newTab.location.href = shopifyCheckoutUrl;
++      } else {
++        // Fallback if tab was blocked somehow
++        window.open(shopifyCheckoutUrl, "_blank", "noopener,noreferrer");
++      }
++    } catch (err) {
++      console.error("Checkout error:", err);
++      if (newTab) newTab.close();
++      setCheckoutError("Something went wrong. Please try again.");
++    } finally {
++      setIsLoading(false);
++    }
++  };
++
++  return (
++    <div className={`${px} mt-6`}>
++      {checkoutError && (
++        <p
++          className="text-[11px] text-red-600 text-center mb-2"
++          style={{ fontFamily: "'DM Sans', sans-serif" }}
++        >
++          {checkoutError}
++        </p>
++      )}
++      <button
++        type="button"
++        onClick={handleCheckout}
++        disabled={isLoading || cartItems.length === 0}
++        className="
++          w-full bg-[#8B7355] hover:bg-[#7A6347] active:bg-[#6B5540]
++          text-white text-[14px] tracking-widest uppercase
++          py-4 transition-colors duration-200
++          disabled:opacity-60 disabled:cursor-not-allowed
++          flex items-center justify-center gap-2
++        "
++        style={{ fontFamily: "'DM Sans', sans-serif", letterSpacing: "0.12em" }}
++      >
++        {isLoading ? (
++          <>
++            <svg
++              className="animate-spin h-4 w-4 text-white"
++              xmlns="http://www.w3.org/2000/svg"
++              fill="none"
++              viewBox="0 0 24 24"
++            >
++              <circle
++                className="opacity-25"
++                cx="12"
++                cy="12"
++                r="10"
++                stroke="currentColor"
++                strokeWidth="4"
++              />
++              <path
++                className="opacity-75"
++                fill="currentColor"
++                d="M4 12a8 8 0 018-8v8z"
++              />
++            </svg>
++            Preparing CheckoutΓÇª
++          </>
++        ) : (
++          "Checkout"
++        )}
++      </button>
++    </div>
++  );
+ }
+\ No newline at end of file
+diff --git a/src/features/cartPage/CheckoutPage.tsx b/src/features/cartPage/CheckoutPage.tsx
+index 1ef966c..f9089a6 100644
+--- a/src/features/cartPage/CheckoutPage.tsx
++++ b/src/features/cartPage/CheckoutPage.tsx
+@@ -12,7 +12,7 @@ const parsePrice = (price: string) => {
+ export default function CheckoutPage() {
+   const navigate = useNavigate();
+   const { cartItems, removeFromCart } = useCart();
+-  const { user } = useUser();
++  const { user, updateProfile } = useUser();
+   const [paymentMethod, setPaymentMethod] = useState<"credit" | "paypal">(
+     "credit"
+   );
+@@ -67,7 +67,7 @@ export default function CheckoutPage() {
+   const total = orderValue + deliveryFee;
+ 
+   const formatPrice = (val: number) =>
+-    `$${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
++    `┬ú ${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+ 
+   const handleCompletePurchase = async () => {
+     if (!user) {
+@@ -92,6 +92,7 @@ export default function CheckoutPage() {
+         height: item.height,
+         heightUnit: item.heightUnit,
+         image: item.image,
++        variantId: item.variantId,
+       }));
+ 
+       // Build shipping address
+@@ -114,6 +115,34 @@ export default function CheckoutPage() {
+         note: `Payment: ${paymentMethod === "credit" ? "Credit/Debit Card" : "PayPal"}`,
+       });
+ 
++      const newOrder = {
++        id: order?.order_number?.toString() || order?.name || `SLY${Math.floor(Math.random() * 1000000)}`,
++        date: new Date().toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' }),
++        status: "Processing" as const,
++        images: cartItems.map((item) => item.image),
++        items: cartItems.map((item) => ({
++          name: item.name,
++          price: formatPrice(parsePrice(item.price)),
++          image: item.image,
++          qty: item.quantity,
++          size: item.size || "M"
++        })),
++        deliveryFee: "Free",
++        tax: formatPrice(0),
++        total: formatPrice(total),
++        paymentMethod: paymentMethod === "credit" ? "Credit Card" : "PayPal",
++        customerName: form.fullName,
++        contactInfo: form.email,
++        deliveryAddress: `${form.address}, ${form.apartment ? form.apartment + ', ' : ''}${form.city}, ${form.state}, ${form.country} - ${form.pinCode}`,
++        billingAddress: useShippingAsBilling 
++          ? `${form.address}, ${form.apartment ? form.apartment + ', ' : ''}${form.city}, ${form.state}, ${form.country} - ${form.pinCode}` 
++          : "Not provided",
++      };
++
++      if (user) {
++        updateProfile({ orders: [newOrder, ...(user.orders || [])] });
++      }
++
+       // Navigate to confirmation page with Shopify order data
+       navigate("/order-confirmation", {
+         state: {
+diff --git a/src/features/cartPage/OrderConfirmationPage.tsx b/src/features/cartPage/OrderConfirmationPage.tsx
+index dccfbf6..842dc55 100644
+--- a/src/features/cartPage/OrderConfirmationPage.tsx
++++ b/src/features/cartPage/OrderConfirmationPage.tsx
+@@ -14,12 +14,13 @@ export default function OrderConfirmationPage() {
+   const items = orderData?.cartItems || [];
+   const form = orderData?.form || {};
+   const subtotal = orderData?.orderValue || 0;
+-  const tax = items.length > 0 ? 45.0 : 0;
+-  const delivery = 0.0;
+-  const finalTotal = subtotal + tax + delivery;
++  // If the checkout provided tax and delivery, use it; otherwise default to 0
++  const tax = orderData?.tax || 0;
++  const delivery = orderData?.deliveryFee || 0;
++  const finalTotal = orderData?.total || subtotal + tax + delivery;
+ 
+   const formatPrice = (val: number) =>
+-    `$${Number(val).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
++    `┬ú ${val.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+ 
+   const orderDate = new Date().toLocaleDateString("en-US", {
+     year: "numeric",
+diff --git a/src/features/product/ProductDetails.tsx b/src/features/product/ProductDetails.tsx
+index 8a8705b..5dfd34d 100644
+--- a/src/features/product/ProductDetails.tsx
++++ b/src/features/product/ProductDetails.tsx
+@@ -65,6 +65,13 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+   const handleAddToCart = () => {
+     if (!productName) return;
+     if (!heightVal.trim()) { triggerHeightToast(); return; }
++    // Find matching variant by title/size, or fallback to the first variant
++    const variant = shopifyProduct?.variants?.find(v => v.title.toLowerCase().includes(selectedSize.toLowerCase()) || v.title.toLowerCase() === selectedSize.toLowerCase()) 
++      || shopifyProduct?.variants?.[0];
++      
++    // Extract numeric ID from gid://shopify/ProductVariant/46663554039868
++    const numericVariantId = variant?.id ? variant.id.split('/').pop() : undefined;
++
+     addToCart({
+       id: slug,
+       name: title,
+@@ -73,6 +80,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+       size: selectedSize,
+       height: heightVal,
+       heightUnit: heightUnit,
++      variantId: numericVariantId,
+     });
+     window.dispatchEvent(new CustomEvent('openCart'));
+   };
+@@ -92,6 +100,27 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+     };
+   }, [showDescPopup]);
+ 
++  // Track product view in history
++  useEffect(() => {
++    if (productName) {
++      const slug = productName.toLowerCase();
++      try {
++        const historyJson = localStorage.getItem("selhaya_view_history");
++        let historySlugs: string[] = historyJson ? JSON.parse(historyJson) : [];
++        // Remove if it exists to put it at the top
++        historySlugs = historySlugs.filter((s) => s !== slug);
++        historySlugs.unshift(slug);
++        // Keep last 20 items max
++        if (historySlugs.length > 20) {
++          historySlugs = historySlugs.slice(0, 20);
++        }
++        localStorage.setItem("selhaya_view_history", JSON.stringify(historySlugs));
++      } catch (e) {
++        console.error("Failed to update view history", e);
++      }
++    }
++  }, [productName]);
++
+   // Close popup when clicking outside
+   useEffect(() => {
+     if (!showDescPopup) return;
+@@ -166,11 +195,11 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+     "rina-lemon": "A fresh, citrus-infused statement of light silk craftsmanship and joyful elegance.",
+   };
+   const priceMap: Record<string, string> = {
+-    "malika-drape": "$ 4700", "sharifa-cut": "$ 4700",
+-    "safa-bloom": "$ 4700", "noor-flow": "$ 4700",
+-    yaqeen: "$ 5200", "amara-flame": "$ 4900",
+-    sabi: "$ 4600", "ziya-blue": "$ 4800",
+-    sakura: "$ 4500", "rina-lemon": "$ 4700",
++    "malika-drape": "┬ú 4700", "sharifa-cut": "┬ú 4700",
++    "safa-bloom": "┬ú 4700", "noor-flow": "┬ú 4700",
++    yaqeen: "┬ú 5200", "amara-flame": "┬ú 4900",
++    sabi: "┬ú 4600", "ziya-blue": "┬ú 4800",
++    sakura: "┬ú 4500", "rina-lemon": "┬ú 4700",
+   };
+ 
+   const brand = shopifyProduct?.collection || brandMap[slug] || shopifyProduct?.vendor || "SELHAYA EDITION";
+@@ -178,7 +207,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+     shopifyProduct?.description || productItem?.content ||
+     descriptionMap[slug] ||
+     "A refined product from Selhaya, crafted with the quiet luxury of timeless silk and modern attention to detail.";
+-  const price = shopifyProduct?.price || priceMap[slug] || "$ 4700";
++  const price = shopifyProduct?.price || priceMap[slug] || "┬ú 4700";
+   const imageSrc = shopifyImages[currentImageIndex]?.url || shopifyImages[0]?.url || (productItem?.mainImageSrc ?? "/safa-bloom.jpg");
+   const imageAlt = shopifyImages[currentImageIndex]?.altText || shopifyImages[0]?.altText || productItem?.mainImageAlt || `${title} ΓÇô product image`;
+ 
+@@ -285,7 +314,7 @@ const ProductDetails: React.FC<ProductDetailsProps> = ({
+ 
+       {/* CTA */}
+       <div className="pd-cta-row">
+-        <button className="pd-add-to-cart" onClick={handleAddToCart}>Add to Cart</button>
++        <button className="pd-add-to-cart" onClick={handleAddToCart}>Reserve the Piece</button>
+         <a href="#request" className="pd-request">Request your Creation</a>
+       </div>
+ 
+diff --git a/src/features/productPage/HayaProductPage.tsx b/src/features/productPage/HayaProductPage.tsx
+index 91cee69..e05e118 100644
+--- a/src/features/productPage/HayaProductPage.tsx
++++ b/src/features/productPage/HayaProductPage.tsx
+@@ -102,16 +102,21 @@ const ImagePanel: React.FC<{ item: ResilienceItem }> = ({ item }) => (
+ /* ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+    Single row ΓÇö alternates card/image each row
+ ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+-const ProductRow: React.FC<{ item: ResilienceItem; index: number }> = ({
++const ProductRow: React.FC<{ item: ResilienceItem; index: number; productSlug?: string }> = ({
+   item,
+   index,
++  productSlug
+ }) => {
+   const isEven = index % 2 === 0; // 0,2 ΓåÆ card left | 1,3 ΓåÆ image left
+ 
++  const oneViewportProducts = ["sakura", "sabi", "amara-flame", "ziya-blue", "rina-lemon", "yaqeen"];
++  const isLandscapeId2 = item.id === 2 && productSlug && oneViewportProducts.includes(productSlug);
++  const desktopHeight = isLandscapeId2 ? "100vh" : "876px";
++
+   return (
+     <>
+       {/* ΓöÇΓöÇ DESKTOP (md+) ΓöÇΓöÇ */}
+-      <div className="hidden md:flex w-full" style={{ height: "876px" }}>
++      <div className="hidden md:flex w-full" style={{ height: desktopHeight }}>
+         {isEven ? (
+           <>
+             <div className="w-1/2 h-full">
+@@ -186,7 +191,7 @@ const ProductRow: React.FC<{ item: ResilienceItem; index: number }> = ({
+ ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ */
+ const HayaProductPage: React.FC<HayaProductPageProps> = ({ data }) => {
+   const { productName } = useParams<{ productName: string }>();
+-  
++
+   // Get data from productPagesData or use passed data
+   const items = data ?? (productName ? productPagesData[productName] : []);
+ 
+@@ -201,7 +206,7 @@ const HayaProductPage: React.FC<HayaProductPageProps> = ({ data }) => {
+   return (
+     <section className="w-full">
+       {items.map((item, index) => (
+-        <ProductRow key={item.id} item={item} index={index} />
++        <ProductRow key={item.id} item={item} index={index} productSlug={productName} />
+       ))}
+     </section>
+   );
+diff --git a/src/features/productPage/Resilience.tsx b/src/features/productPage/Resilience.tsx
+index 362b226..82f26d4 100644
+--- a/src/features/productPage/Resilience.tsx
++++ b/src/features/productPage/Resilience.tsx
+@@ -365,10 +365,14 @@ const ResilienceRow: React.FC<{
+     const mobileBgColor = isSecondRowRight ? specialSecondRowRightBg : "#F9F4EE";
+     const archCardBgColor = isSecondRowRight ? specialSecondRowRightBg : undefined;
+ 
++    const oneViewportProducts = ["sakura", "sabi", "amara-flame", "ziya-blue", "rina-lemon", "yaqeen"];
++    const isLandscapeId2 = isProductPage && item.id === 2 && productSlug && oneViewportProducts.includes(productSlug);
++    const desktopHeight = isLandscapeId2 ? "100vh" : "876px";
++
+     return (
+       <>
+         {/* ΓöÇΓöÇ DESKTOP (md+) ΓöÇΓöÇ */}
+-        <div className="hidden md:flex w-full" style={{ height: "876px" }}>
++        <div className="hidden md:flex w-full" style={{ height: desktopHeight }}>
+           {isEven ? (
+             <>
+               <div className="w-1/2 h-full">
+diff --git a/src/features/profilePage/OrderHistory.tsx b/src/features/profilePage/OrderHistory.tsx
+index 05ab495..cb08694 100644
+--- a/src/features/profilePage/OrderHistory.tsx
++++ b/src/features/profilePage/OrderHistory.tsx
+@@ -4,6 +4,7 @@ import { useState } from "react";
+ import { ORDER_HISTORY_STRINGS } from "./orderHistoryStrings";
+ import { sampleOrders } from "./orderData";
+ import type { Order } from "./orderData";
++import { useUser } from "../../context/UserContext";
+ 
+ function OrderRow({
+   order,
+@@ -300,7 +301,29 @@ type OrderHistoryProps = {
+ 
+ export default function OrderHistory({ onViewDetail }: OrderHistoryProps) {
+   const [currentPage, setCurrentPage] = useState(1);
+-  const totalPages = 10;
++  const { user } = useUser();
++  
++  const rawOrders = user?.orders || [];
++  
++  // Format any old orders that might have $ to ┬ú
++  const ordersToDisplay = rawOrders.map(order => ({
++    ...order,
++    total: order.total?.replace("$", "┬ú") || "",
++    tax: order.tax?.replace("$", "┬ú") || "",
++    deliveryFee: order.deliveryFee?.replace("$", "┬ú") || "",
++    items: order.items.map(item => ({
++      ...item,
++      price: item.price?.replace("$", "┬ú") || ""
++    }))
++  }));
++  
++  const itemsPerPage = 5;
++  const totalPages = Math.max(1, Math.ceil(ordersToDisplay.length / itemsPerPage));
++  
++  const paginatedOrders = ordersToDisplay.slice(
++    (currentPage - 1) * itemsPerPage,
++    currentPage * itemsPerPage
++  );
+ 
+   return (
+     <div className="w-full md:max-w-[700px] pt-4 md:pt-0">
+@@ -316,14 +339,14 @@ export default function OrderHistory({ onViewDetail }: OrderHistoryProps) {
+       </div>
+ 
+       {/* Orders */}
+-      {sampleOrders.length === 0 ? (
++      {paginatedOrders.length === 0 ? (
+         <p className="font-['DM_Sans'] text-[13px] text-[#281B13] mt-4">
+           {ORDER_HISTORY_STRINGS.noOrders}
+         </p>
+       ) : (
+         <div className="flex flex-col">
+-          {sampleOrders.map((order, i) => (
+-            <OrderRow key={i} order={order} onViewDetail={onViewDetail} />
++          {paginatedOrders.map((order, i) => (
++            <OrderRow key={order.id || i} order={order} onViewDetail={onViewDetail} />
+           ))}
+         </div>
+       )}
+diff --git a/src/features/profilePage/ProfilePage.tsx b/src/features/profilePage/ProfilePage.tsx
+index 7db3073..7789aae 100644
+--- a/src/features/profilePage/ProfilePage.tsx
++++ b/src/features/profilePage/ProfilePage.tsx
+@@ -31,7 +31,7 @@ function renderPanel(
+       return <PersonalInfo />;
+     case "orders": {
+       if (!selectedOrder) return <OrderHistory onViewDetail={onViewDetail} />;
+-      const orderDetail = getOrderDetailData(selectedOrder.id);
++      const orderDetail = getOrderDetailData(selectedOrder);
+       return orderDetail ? (
+         <OrderDetail onBack={onBack} data={orderDetail} />
+       ) : (
+diff --git a/src/features/profilePage/ViewFavorites.tsx b/src/features/profilePage/ViewFavorites.tsx
+index 314cde8..1179172 100644
+--- a/src/features/profilePage/ViewFavorites.tsx
++++ b/src/features/profilePage/ViewFavorites.tsx
+@@ -11,6 +11,9 @@ const MOBILE_PER_PAGE  = 6;
+ 
+ // ΓöÇΓöÇΓöÇ Card ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ 
++import { useNavigate } from "react-router-dom";
++import { getProductURLsCache } from "../../lib/productURLHelper";
++
+ function FavoriteCard({
+   item,
+   isMobile,
+@@ -24,16 +27,36 @@ function FavoriteCard({
+ }) {
+   const [overlayOpen, setOverlayOpen] = useState(false);
+   const [selectedSize, setSelectedSize] = useState<string | null>(null);
++  const navigate = useNavigate();
+ 
+   const cardW = isMobile ? 156 : 182;
+   const cardH = isMobile ? 280 : 250;
+ 
++  const handleNavigate = async () => {
++    try {
++      const urls = await getProductURLsCache();
++      const match = urls.find((u) => u.handle === item.slug);
++      if (match) {
++        navigate(match.url);
++      } else {
++        navigate(`/products/${item.slug}`);
++      }
++    } catch {
++      navigate(`/products/${item.slug}`);
++    }
++  };
++
++  const formattedPrice = item.price.startsWith("┬ú") || item.price.startsWith("$") 
++    ? item.price.replace("$", "┬ú")
++    : `┬ú ${Number(item.price.replace(/[^0-9.]/g, "")).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
++
+   return (
+     <div className="flex flex-col" style={{ width: cardW }}>
+       {/* Image + bottom overlay */}
+       <div
+-        className="relative overflow-hidden bg-[#E4DDCB]"
++        className="relative overflow-hidden bg-[#E4DDCB] cursor-pointer"
+         style={{ width: cardW, height: cardH }}
++        onClick={handleNavigate}
+       >
+         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+ 
+@@ -41,6 +64,7 @@ function FavoriteCard({
+           <div
+             className="absolute bottom-0 left-0 right-0 bg-white flex flex-col"
+             style={{ height: "50%" }}
++            onClick={(e) => e.stopPropagation()}
+           >
+             {/* Top section: sizes + divider + REMOVE ΓÇö all centred */}
+             <div className="flex flex-col items-center justify-center flex-1 gap-[4px] px-2">
+@@ -85,12 +109,12 @@ function FavoriteCard({
+ 
+       {/* Below card: name+price left | + right */}
+       <div className="flex items-start justify-between mt-2" style={{ width: cardW }}>
+-        <div className="flex flex-col gap-0.5">
+-          <p className="m-0 text-[12px] leading-tight font-medium text-[#402C1F] font-['DM_Sans']">
++        <div className="flex flex-col gap-0.5 cursor-pointer" onClick={handleNavigate}>
++          <p className="m-0 text-[12px] leading-tight font-medium text-[#402C1F] font-['DM_Sans'] hover:opacity-70 transition-opacity">
+             {item.name}
+           </p>
+           <p className="m-0 text-[12px] leading-tight text-[#C5B4A0] font-['DM_Sans']">
+-            {item.price}
++            {formattedPrice}
+           </p>
+         </div>
+ 
+@@ -179,6 +203,8 @@ function Pagination({
+ 
+ // ΓöÇΓöÇΓöÇ Main ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ 
++import { productBySlug } from "../../lib/productImages";
++
+ export default function ViewFavorites() {
+   const { favorites } = useFavorites();
+   const [items, setItems] = useState<FavoriteItem[]>([]);
+@@ -197,7 +223,9 @@ export default function ViewFavorites() {
+   useEffect(() => { setCurrentPage(1); }, [isMobile]);
+ 
+   useEffect(() => {
+-    setItems(favorites);
++    // Filter out dummy data that is not in the real product registry
++    const realFavorites = favorites.filter(fav => !!productBySlug[fav.slug]);
++    setItems(realFavorites);
+     setLoading(false);
+   }, [favorites]);
+ 
+diff --git a/src/features/profilePage/ViewHistory.tsx b/src/features/profilePage/ViewHistory.tsx
+index b45f072..8347465 100644
+--- a/src/features/profilePage/ViewHistory.tsx
++++ b/src/features/profilePage/ViewHistory.tsx
+@@ -1,6 +1,8 @@
+-// ViewHistory.tsx
+-
+ import { useState, useEffect } from "react";
++import { useNavigate } from "react-router-dom";
++import { allProducts, productBySlug } from "../../lib/productImages";
++import { fetchShopifyProducts } from "../../lib/shopify";
++import { getProductURLsCache } from "../../lib/productURLHelper";
+ 
+ // ΓöÇΓöÇΓöÇ Data ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+ 
+@@ -11,9 +13,6 @@ interface HistoryItem {
+   price: string;
+ }
+ 
+-import { allProducts } from "../../lib/productImages";
+-import { fetchShopifyProducts } from "../../lib/shopify";
+-
+ const DESKTOP_PER_PAGE = 8;
+ const MOBILE_PER_PAGE  = 6;
+ 
+@@ -22,16 +21,36 @@ const MOBILE_PER_PAGE  = 6;
+ function HistoryCard({ item, isMobile }: { item: HistoryItem; isMobile: boolean }) {
+   const [overlayOpen, setOverlayOpen] = useState(false);
+   const [selectedSize, setSelectedSize] = useState<string | null>(null);
++  const navigate = useNavigate();
+ 
+   const cardW = isMobile ? 156 : 182;
+   const cardH = isMobile ? 280 : 250;
+ 
++  const handleNavigate = async () => {
++    try {
++      const urls = await getProductURLsCache();
++      const match = urls.find((u) => u.handle === item.id);
++      if (match) {
++        navigate(match.url);
++      } else {
++        navigate(`/products/${item.id}`);
++      }
++    } catch {
++      navigate(`/products/${item.id}`);
++    }
++  };
++
++  const formattedPrice = item.price.startsWith("┬ú") || item.price.startsWith("$") 
++    ? item.price.replace("$", "┬ú")
++    : `┬ú ${Number(item.price.replace(/[^0-9.]/g, "")).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
++
+   return (
+     <div className="flex flex-col" style={{ width: cardW }}>
+       {/* Image + bottom overlay */}
+       <div
+-        className="relative overflow-hidden bg-[#E4DDCB]"
++        className="relative overflow-hidden bg-[#E4DDCB] cursor-pointer"
+         style={{ width: cardW, height: cardH }}
++        onClick={handleNavigate}
+       >
+         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+ 
+@@ -39,6 +58,7 @@ function HistoryCard({ item, isMobile }: { item: HistoryItem; isMobile: boolean
+           <div
+             className="absolute bottom-0 left-0 right-0 bg-white flex flex-col items-center justify-center px-2 py-2 gap-[5px]"
+             style={{ height: "50%" }}
++            onClick={(e) => e.stopPropagation()}
+           >
+             {/* Sizes ΓÇö centred */}
+             {(["[S] SMALL", "[M] MEDIUM", "[L] LARGE"] as const).map((size) => {
+@@ -62,7 +82,7 @@ function HistoryCard({ item, isMobile }: { item: HistoryItem; isMobile: boolean
+             </div>
+ 
+             {/* Save for later ΓÇö centred */}
+-            <button className="flex items-center justify-center gap-1 w-full text-[12px] text-[#402C1F] font-['DM_Sans'] border-none bg-transparent cursor-pointer p-0">
++            <button className="flex items-center justify-center gap-1 w-full text-[12px] text-[#402C1F] font-['DM_Sans'] border-none bg-transparent cursor-pointer p-0 hover:opacity-60 transition-opacity">
+               SAVE FOR LATER
+               <svg width="11" height="13" viewBox="0 0 11 13" fill="none">
+                 <path d="M1 1.5h9v10.5L5.5 9 1 12V1.5z" stroke="#402C1F" strokeWidth="1.2" fill="none" />
+@@ -74,12 +94,12 @@ function HistoryCard({ item, isMobile }: { item: HistoryItem; isMobile: boolean
+ 
+       {/* Below card: name+price left | + right */}
+       <div className="flex items-start justify-between mt-2" style={{ width: cardW }}>
+-        <div className="flex flex-col gap-0.5">
+-          <p className="m-0 text-[12px] leading-tight font-medium text-[#402C1F] font-['DM_Sans']">
++        <div className="flex flex-col gap-0.5 cursor-pointer" onClick={handleNavigate}>
++          <p className="m-0 text-[12px] leading-tight font-medium text-[#402C1F] font-['DM_Sans'] hover:opacity-70 transition-opacity">
+             {item.name}
+           </p>
+           <p className="m-0 text-[12px] leading-tight text-[#C5B4A0] font-['DM_Sans']">
+-            {item.price}
++            {formattedPrice}
+           </p>
+         </div>
+ 
+@@ -184,36 +204,45 @@ export default function ViewHistory() {
+   useEffect(() => { setCurrentPage(1); }, [isMobile]);
+ 
+   useEffect(() => {
+-    // Initial load from static registry
+-    const initialMapped: HistoryItem[] = allProducts.map((p) => ({
+-      id: p.slug,
+-      name: p.name,
+-      image: p.image,
+-      price: p.price,
+-    }));
+-    setItems(initialMapped);
+-    setLoading(true);
+-
+-    // Fetch real-time prices from Shopify
+-    const updatePrices = async () => {
++    // Load viewed product slugs from local storage
++    const loadHistory = async () => {
+       try {
+-        const shopifyData = await fetchShopifyProducts(50);
++        setLoading(true);
++        const historyJson = localStorage.getItem("selhaya_view_history");
++        const historySlugs: string[] = historyJson ? JSON.parse(historyJson) : [];
+         
+-        setItems(prevItems => prevItems.map(item => {
+-          const shopifyMatch = shopifyData.find(s => s.handle === item.id);
+-          if (shopifyMatch && shopifyMatch.price) {
+-            return { ...item, price: shopifyMatch.price };
+-          }
+-          return item; // keeps static price (e.g. for Pink Collection)
+-        }));
++        // Filter and map to real product data
++        let historyItems: HistoryItem[] = historySlugs
++          .map(slug => productBySlug[slug])
++          .filter(Boolean)
++          .map(p => ({
++            id: p.slug,
++            name: p.name,
++            image: p.image,
++            price: p.price,
++          }));
++          
++        setItems(historyItems);
++
++        // Fetch real-time prices from Shopify for the items
++        if (historyItems.length > 0) {
++          const shopifyData = await fetchShopifyProducts(50);
++          setItems(prevItems => prevItems.map(item => {
++            const shopifyMatch = shopifyData.find(s => s.handle === item.id);
++            if (shopifyMatch && shopifyMatch.price) {
++              return { ...item, price: shopifyMatch.price };
++            }
++            return item;
++          }));
++        }
+       } catch (error) {
+-        console.error("Failed to fetch Shopify prices for history:", error);
++        console.error("Failed to load view history:", error);
+       } finally {
+         setLoading(false);
+       }
+     };
+ 
+-    updatePrices();
++    loadHistory();
+   }, []);
+ 
+   const perPage        = isMobile ? MOBILE_PER_PAGE : DESKTOP_PER_PAGE;
+diff --git a/src/features/profilePage/orderData.ts b/src/features/profilePage/orderData.ts
+index 69f889c..ad2a9d7 100644
+--- a/src/features/profilePage/orderData.ts
++++ b/src/features/profilePage/orderData.ts
+@@ -1,6 +1,9 @@
+ export type OrderItem = {
+   name: string;
+   price: string;
++  image?: string;
++  qty?: number;
++  size?: string;
+ };
+ 
+ export type Order = {
+@@ -13,6 +16,10 @@ export type Order = {
+   tax: string;
+   total: string;
+   paymentMethod: string;
++  customerName?: string;
++  contactInfo?: string;
++  deliveryAddress?: string;
++  billingAddress?: string;
+ };
+ 
+ export type TrackingStep = {
+@@ -59,13 +66,13 @@ export const sampleOrders: Order[] = [
+     status: "Processing",
+     images: ["/images/order1a.png", "/images/order1b.png", "/images/order1c.png"],
+     items: [
+-      { name: "Safa Bloom", price: "$6,000.00" },
+-      { name: "Sharifa cut", price: "$5,000.00" },
+-      { name: "Yaqeen", price: "$10,000.00" },
++      { name: "Safa Bloom", price: "┬ú 6,000.00" },
++      { name: "Sharifa cut", price: "┬ú 5,000.00" },
++      { name: "Yaqeen", price: "┬ú 10,000.00" },
+     ],
+     deliveryFee: "Free",
+-    tax: "$50",
+-    total: "$21,000.00",
++    tax: "┬ú 50.00",
++    total: "┬ú 21,000.00",
+     paymentMethod: "paypal",
+   },
+   {
+@@ -74,13 +81,13 @@ export const sampleOrders: Order[] = [
+     status: "Shipped",
+     images: ["/images/order2a.png", "/images/order2b.png", "/images/order2c.png"],
+     items: [
+-      { name: "Safa Bloom", price: "$6,000.00" },
+-      { name: "Sharifa cut", price: "$5,000.00" },
+-      { name: "Yaqeen", price: "$10,000.00" },
++      { name: "Safa Bloom", price: "┬ú 6,000.00" },
++      { name: "Sharifa cut", price: "┬ú 5,000.00" },
++      { name: "Yaqeen", price: "┬ú 10,000.00" },
+     ],
+     deliveryFee: "Free",
+-    tax: "$50",
+-    total: "$21,000.00",
++    tax: "┬ú 50.00",
++    total: "┬ú 21,000.00",
+     paymentMethod: "paypal",
+   },
+   {
+@@ -89,13 +96,13 @@ export const sampleOrders: Order[] = [
+     status: "Delivered",
+     images: ["/images/order3a.png", "/images/order3b.png", "/images/order3c.png"],
+     items: [
+-      { name: "Safa Bloom", price: "$6,000.00" },
+-      { name: "Sharifa cut", price: "$5,000.00" },
+-      { name: "Yaqeen", price: "$10,000.00" },
++      { name: "Safa Bloom", price: "┬ú 6,000.00" },
++      { name: "Sharifa cut", price: "┬ú 5,000.00" },
++      { name: "Yaqeen", price: "┬ú 10,000.00" },
+     ],
+     deliveryFee: "Free",
+-    tax: "$50",
+-    total: "$21,000.00",
++    tax: "┬ú 50.00",
++    total: "┬ú 21,000.00",
+     paymentMethod: "paypal",
+   },
+ ];
+@@ -114,58 +121,60 @@ const defaultDetail: Omit<OrderDetailData, "trackingId" | "status" | "trackingHi
+   paidBy: "Paid by paypal",
+ };
+ 
+-function buildTrackingHistory(status: Order["status"]): TrackingStep[] {
++function buildTrackingHistory(status: Order["status"], orderDate: string): TrackingStep[] {
+   if (status === "Processing") {
+     return [
+-      { date: "02 Mar 2026", time: "At 9:00 AM", status: "Order Received", location: "All India", active: true },
+-      { date: "03 Mar 2026", time: "At 5:30 PM", status: "Order Picked up", location: "from UK", active: false },
+-      { date: "04 Mar 2026", time: "At 2:30 PM", status: "Shipped", location: "At UK", active: false },
++      { date: orderDate, time: "Just now", status: "Order Received", location: "Confirmed", active: true },
++      { date: "Pending", time: "-", status: "Order Picked up", location: "Pending", active: false },
++      { date: "Pending", time: "-", status: "Shipped", location: "Pending", active: false },
+     ];
+   }
+   if (status === "Shipped") {
+     return [
+-      { date: "03 Mar 2026", time: "At 2:30 PM", status: "Shipped", location: "At UK", active: true },
+-      { date: "02 Mar 2026", time: "At 5:30 PM", status: "Order Picked up", location: "from UK", active: false },
+-      { date: "01 Mar 2026", time: "At 1:00 PM", status: "Order Received", location: "All India", active: false },
++      { date: orderDate, time: "Earlier", status: "Order Received", location: "Confirmed", active: false },
++      { date: orderDate, time: "Earlier", status: "Order Picked up", location: "Warehouse", active: false },
++      { date: orderDate, time: "Just now", status: "Shipped", location: "In Transit", active: true },
+     ];
+   }
+   return [
+-    { date: "05 Mar 2026", time: "At 10:00 AM", status: "Delivered", location: "Customer address", active: true },
+-    { date: "04 Mar 2026", time: "At 2:30 PM", status: "Shipped", location: "At UK", active: false },
+-    { date: "03 Mar 2026", time: "At 5:30 PM", status: "Order Picked up", location: "from UK", active: false },
++    { date: orderDate, time: "Earlier", status: "Order Received", location: "Confirmed", active: false },
++    { date: orderDate, time: "Earlier", status: "Shipped", location: "In Transit", active: false },
++    { date: orderDate, time: "Just now", status: "Delivered", location: "Customer address", active: true },
+   ];
+ }
+ 
+-export function getOrderDetailData(orderId: string): OrderDetailData | undefined {
+-  const order = sampleOrders.find((item) => item.id === orderId);
++export function getOrderDetailData(orderOrId: string | Order): OrderDetailData | undefined {
++  const order = typeof orderOrId === "string" 
++    ? sampleOrders.find((item) => item.id === orderOrId)
++    : orderOrId;
+   if (!order) return undefined;
+ 
+   const products: OrderProduct[] = order.items.map((item, index) => ({
+-    image: `/images/product-${index + 1}.png`,
++    image: item.image || order.images[index] || `/images/product-${index + 1}.png`,
+     name: item.name,
+     ref: `${order.id}-${index + 1}`,
+-    qty: 1,
+-    size: "S",
+-    price: item.price.startsWith("$") ? `+ ${item.price}` : item.price,
++    qty: item.qty || 1,
++    size: item.size || "S",
++    price: (item.price.startsWith("┬ú") || item.price.startsWith("Γé¼") || item.price.startsWith("$") ? item.price : `+ ${item.price}`).replace("$", "┬ú"),
+   }));
+ 
+   return {
+     trackingId: order.id,
+     status: order.status,
+-    lastUpdated: defaultDetail.lastUpdated,
+-    trackingHistory: buildTrackingHistory(order.status),
+-    customerName: defaultDetail.customerName,
+-    contactInfo: defaultDetail.contactInfo,
+-    deliveryAddress: defaultDetail.deliveryAddress,
++    lastUpdated: order.date,
++    trackingHistory: buildTrackingHistory(order.status, order.date),
++    customerName: order.customerName || defaultDetail.customerName,
++    contactInfo: order.contactInfo || defaultDetail.contactInfo,
++    deliveryAddress: order.deliveryAddress || defaultDetail.deliveryAddress,
+     seller: defaultDetail.seller,
+     sellerEmail: defaultDetail.sellerEmail,
+-    billingAddress: defaultDetail.billingAddress,
+-    paymentStatus: defaultDetail.paymentStatus,
++    billingAddress: order.billingAddress || defaultDetail.billingAddress,
++    paymentStatus: `Paid by ${order.paymentMethod}`,
+     products,
+     total: order.total,
+     tax: order.tax,
+     deliveryFee: order.deliveryFee,
+     totalAmount: order.total,
+-    paidBy: defaultDetail.paidBy,
++    paidBy: `Paid by ${order.paymentMethod}`,
+   };
+ }
+diff --git a/src/features/profilePage/profileData.tsx b/src/features/profilePage/profileData.tsx
+index d0ec4ce..25e4ac6 100644
+--- a/src/features/profilePage/profileData.tsx
++++ b/src/features/profilePage/profileData.tsx
+@@ -1,5 +1,7 @@
+ // profileData.tsx
+ 
++import { type Order } from "./orderData";
++
+ export interface Address {
+   id: number;
+   fullName: string;
+@@ -17,6 +19,7 @@ export interface PersonalData {
+   phoneNumber: string;
+   email: string;
+   addresses: Address[];
++  orders?: Order[];
+ }
+ 
+ export type SidebarTab = "personal" | "orders" | "history" | "favorites";
+diff --git a/src/lib/productImages.ts b/src/lib/productImages.ts
+index afee1c3..b20b06c 100644
+--- a/src/lib/productImages.ts
++++ b/src/lib/productImages.ts
+@@ -49,21 +49,21 @@ const collectionMap: Record<string, string> = {
+ };
+ 
+ const priceMap: Record<string, string> = {
+-  "malika-drape": "$ 4700",
+-  "sharifa-cut":  "$ 4700",
+-  "safa-bloom":   "$ 4700",
+-  "noor-flow":    "$ 4700",
+-  yaqeen:         "$ 5200",
+-  "amara-flame":  "$ 4900",
+-  sabi:           "$ 4600",
+-  "ziya-blue":    "$ 4800",
+-  sakura:         "$ 4500",
+-  "rina-lemon":   "$ 4700",
+-  tatiana:        "$ 4800",
+-  seraphina:      "$ 4800",
+-  clara:          "$ 4800",
+-  halime:         "$ 4800",
+-  farhana:        "$ 4800",
++  "malika-drape": "┬ú 4,700",
++  "sharifa-cut":  "┬ú 4,700",
++  "safa-bloom":   "┬ú 4,700",
++  "noor-flow":    "┬ú 4,700",
++  yaqeen:         "┬ú 5,200",
++  "amara-flame":  "┬ú 4,900",
++  sabi:           "┬ú 4,600",
++  "ziya-blue":    "┬ú 4,800",
++  sakura:         "┬ú 4,500",
++  "rina-lemon":   "┬ú 4,700",
++  tatiana:        "┬ú 4,800",
++  seraphina:      "┬ú 4,800",
++  clara:          "┬ú 4,800",
++  halime:         "┬ú 4,800",
++  farhana:        "┬ú 4,800",
+ };
+ 
+ // ΓöÇΓöÇΓöÇ Master list ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+diff --git a/src/lib/shopify.ts b/src/lib/shopify.ts
+index 0bf9df3..58089ae 100644
+--- a/src/lib/shopify.ts
++++ b/src/lib/shopify.ts
+@@ -2,6 +2,7 @@ declare global {
+   interface ImportMetaEnv {
+     VITE_SHOPIFY_STORE?: string;
+     VITE_SHOPIFY_ACCESS_TOKEN?: string;
++    VITE_SHOPIFY_STOREFRONT_TOKEN?: string;
+   }
+ 
+   interface ImportMeta {
+@@ -41,7 +42,10 @@ export interface ProductURLData {
+ }
+ 
+ const shop = import.meta.env.VITE_SHOPIFY_STORE?.trim() ?? "";
+-const token = import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim() ?? "";
++// Storefront token ΓÇö prefer the dedicated STOREFRONT_TOKEN, fall back to ACCESS_TOKEN
++const token =
++  (import.meta.env.VITE_SHOPIFY_STOREFRONT_TOKEN?.trim() ||
++    import.meta.env.VITE_SHOPIFY_ACCESS_TOKEN?.trim()) ?? "";
+ const apiVersion = "2024-10";
+ const shopDomain = shop.includes(".myshopify.com") ? shop : `${shop}.myshopify.com`;
+ 
+@@ -128,7 +132,7 @@ export async function fetchShopifyProductByHandle(
+ 
+   const priceRange = product.priceRange?.minVariantPrice;
+   const price = priceRange
+-    ? `${priceRange.amount} ${priceRange.currencyCode}`
++    ? `┬ú ${parseFloat(priceRange.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+     : "";
+ 
+   return {
+@@ -209,13 +213,29 @@ export async function createShopifyCheckout(
+       return null;
+     }
+ 
+-    return cartCreate?.cart?.checkoutUrl || null;
++    const rawUrl: string | undefined = cartCreate?.cart?.checkoutUrl;
++    if (!rawUrl) return null;
++
++    // The Storefront API may return checkoutUrl as https://selhaya.com/cart/c/...
++    // But selhaya.com is the React app which throws a 404.
++    // The actual Shopify checkout domain is shop.selhaya.com.
++    try {
++      const parsed = new URL(rawUrl);
++      // Force it to use the Shopify checkout subdomain
++      if (parsed.hostname === "selhaya.com" || parsed.hostname === shopDomain) {
++        parsed.hostname = "shop.selhaya.com";
++      }
++      return parsed.toString();
++    } catch {
++      return rawUrl;
++    }
+   } catch (error) {
+     console.error("Error creating Shopify checkout:", error);
+     return null;
+   }
+ }
+ 
++
+ const productsQuery = `query ProductsList($first: Int!) {
+   products(first: $first) {
+     edges {
+@@ -276,7 +296,7 @@ export async function fetchShopifyProducts(
+   return edges.map(({ node }: any) => {
+     const priceRange = node.priceRange?.minVariantPrice;
+     const price = priceRange
+-      ? `$${parseFloat(priceRange.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
++      ? `┬ú ${parseFloat(priceRange.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+       : "";
+ 
+     return {

@@ -1,0 +1,14 @@
+User-agent: *
+Allow: /
+
+Disallow: /login
+Disallow: /register
+Disallow: /forgot
+Disallow: /profile
+Disallow: /account/
+Disallow: /cart
+Disallow: /checkout
+Disallow: /order-confirmation
+Disallow: /test-product
+
+Sitemap: https://selhaya.com/sitemap.xml
