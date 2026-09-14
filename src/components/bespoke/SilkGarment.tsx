@@ -73,6 +73,7 @@ export default function SilkGarment() {
         desktopText=<>
          Every commission is conceived privately and crafted in pure silk for special occasions with  <br />the quiet artistry of the House.
         </>
+        desktopTextClassName="text-[14px]"
         mobileText="Every commission is conceived privately and crafted in pure silk, with the quiet artistry of the House."
         buttonText="Begin a Private Enquiry"
         onButtonClick={scrollToEnquiry}
@@ -81,6 +82,8 @@ export default function SilkGarment() {
       <Section2
         image={garmentImg}
         imageAlt="The Art of Personal Couture"
+        titleClassName="text-[26px] md:text-[30px]"
+        paragraphClassName="text-[14px] xl:text-[18px] space-y-4 xl:space-y-6 leading-relaxed"
         title="The Art of Personal Couture."
         paragraphs={[
           <>
@@ -97,12 +100,19 @@ export default function SilkGarment() {
       <Section3
         heading={<>A private process. A singular{" "}<br className="hidden xl:block" />{" "}creation.</>}
         image={sec3}
+        headingClassName="text-[26px] md:text-[30px]"
+        paragraphClassName="text-[14px] leading-relaxed"
+        stepTitleClassName="text-[14px] md:text-[20px]"
+        stepContentClassName="text-[12px] md:text-[14px] leading-relaxed"
         description="From the first conversation to final delivery, each decision is shaped around the woman, the occasion, and the story the garment is intended to carry."
         steps={silkGarmentSteps}
       />
 
       <Section4
         backgroundImage={sec4Garment}
+        titleClassName="text-[24px] md:text-[30px]"
+        descriptionClassName="text-[12px] md:text-[14px]"
+        taglineClassName="text-[20px] md:text-[26px]"
         title="THE MAKING OF A SINGULAR PIECE"
         mobTitle={
           <>
@@ -137,9 +147,9 @@ export default function SilkGarment() {
           <svg width="25" height="19" viewBox="0 0 25 19" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M17.7432 19C14.8405 19 12.9745 16.8 13.5965 14C13.5965 13.9 13.7002 13.8 13.7002 13.7C15.0479 8.90001 21.5789 5.80001 22.9266 0H25C24.067 4.2 19.8166 6.60001 17.0175 9.7C17.9506 9.3 18.8836 9 19.9203 9C22.823 9 24.5853 11.2 23.9633 14C23.3413 16.8 20.6459 19 17.7432 19ZM0.119629 14C0.119629 13.9 0.223297 13.8 0.223297 13.7C1.57098 8.90001 8.10208 5.80001 9.44977 0H11.5231C10.5901 4.2 6.33972 6.60001 3.54068 9.7C4.47369 9.3 5.40671 9 6.44339 9C9.3461 9 11.1085 11.2 10.4865 14C9.86444 16.8 7.16907 19 4.26636 19C1.36365 19 -0.50238 16.8 0.119629 14Z" fill="#281B13" />
           </svg>
-          <h2 className="text-[24px] md:text-[28px] lg:text-[32px] mt-10 mb-6">We design for legacy.</h2>
-          <p className="text-[16px]">From silhouette and texture to embroidery and ceremonial{" "}<br className="hidden lg:block" />{" "}presence, every detail is considered to create a piece that{" "}<br className="hidden lg:block" />{" "}carries meaning beyond the occasion.</p>
-          <p className="uppercase mt-6">Weddings · Special Occasions · Red-Carpet{" "}<br className="hidden md:block" />{" "}Appearances · Couture Pieces</p>
+          <h2 className="text-[22px] md:text-[26px] lg:text-[30px] mt-8 mb-4">We design for legacy.</h2>
+          <p className="text-[14px] leading-relaxed">From silhouette and texture to embroidery and ceremonial{" "}<br className="hidden lg:block" />{" "}presence, every detail is considered to create a piece that{" "}<br className="hidden lg:block" />{" "}carries meaning beyond the occasion.</p>
+          <p className="uppercase mt-6 text-[14px]">Weddings · Special Occasions · Red-Carpet{" "}<br className="hidden md:block" />{" "}Appearances · Couture Pieces</p>
         </div>
       </section>
 

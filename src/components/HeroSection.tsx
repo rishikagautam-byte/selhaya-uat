@@ -19,6 +19,7 @@ interface HeroSectionProps {
     onButtonClick?: () => void;
     textColor?: string;
     twoLinks?: React.ReactNode;
+    desktopTextClassName?: string;
 }
 
 const HeroSection = ({
@@ -36,7 +37,8 @@ const HeroSection = ({
     buttonLink = "",
     onButtonClick,
     textColor = "text-white",
-    twoLinks = <></>
+    twoLinks = <></>,
+    desktopTextClassName = "",
 }: HeroSectionProps) => {
     const { scrollY } = useScroll();
     const heroY = useTransform(scrollY, [0, 500], [0, 180]);
@@ -130,7 +132,7 @@ const HeroSection = ({
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.2, duration: 1 }}
                         >
-                            <div className={`${textColor} mt-2 hidden md:block text-[16px] text-center leading-snug ${typeof title === "string" && title === "The World of Selhaya" ? "" : ""}`}>
+                            <div className={`${textColor} mt-2 hidden md:block ${desktopTextClassName || "text-[16px]"} text-center leading-snug ${typeof title === "string" && title === "The World of Selhaya" ? "" : ""}`}>
                                 {desktopText}
                             </div>
 

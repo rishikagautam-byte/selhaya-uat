@@ -53,6 +53,7 @@ export default function SilkArt() {
           Created for collectors, institutions, and those who wish to preserve stories through silk, <br />
           craftsmanship, and cultural artistry.
         </>
+        desktopTextClassName="text-[12px]"
         mobileText="Created for collectors, institutions, and those who wish to preserve stories through silk, craftsmanship, and cultural artistry."
         buttonText="Begin a Private Enquiry"
         onButtonClick={scrollToEnquiry}
@@ -61,6 +62,8 @@ export default function SilkArt() {
       <Section2
         image={artImg}
         imageAlt="Some stories are worn. Others are preserved."
+        titleClassName="text-[24px] md:text-[28px]"
+        paragraphClassName="text-[12px] xl:text-[16px] space-y-4 xl:space-y-6 leading-relaxed"
         title={
           <>
             Some stories are worn. <br />
@@ -81,6 +84,10 @@ export default function SilkArt() {
       />          
       <Section3
         heading={<>From conversation{" "}<br className="hidden xl:block" />{" "}to collectible.</>}
+        headingClassName="text-[24px] md:text-[28px]"
+        paragraphClassName="text-[12px] leading-relaxed"
+        stepTitleClassName="text-[12px] md:text-[18px]"
+        stepContentClassName="text-[10px] md:text-[12px] leading-relaxed"
         description={<>Every Bespoke Silk Art commission follows a private creative{" "}<br className="hidden xl:block" />
           process led by the House. Each work evolves through{" "}<br className="hidden xl:block" />
           symbolism, craftsmanship, and artistic direction, ensuring that{" "}<br className="hidden xl:block" />
@@ -89,6 +96,9 @@ export default function SilkArt() {
 
       <Section4
         backgroundImage={sec4Art}
+        titleClassName="text-[22px] md:text-[28px]"
+        descriptionClassName="text-[10px] md:text-[12px]"
+        taglineClassName="text-[18px] md:text-[24px]"
         title={
           <>
             Created through craftsmanship. <br />

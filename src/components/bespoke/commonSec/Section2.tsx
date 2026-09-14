@@ -16,6 +16,8 @@ export interface Section2Props {
   onLinkClick?: () => void;
   className?: string;
   imageClassName?: string;
+  titleClassName?: string;
+  paragraphClassName?: string;
 }
 
 export default function Section2({
@@ -30,6 +32,8 @@ export default function Section2({
   onLinkClick,
   className = "",
   imageClassName = "",
+  titleClassName = "",
+  paragraphClassName = "",
 }: Section2Props) {
   return (
     <section
@@ -57,13 +61,13 @@ export default function Section2({
         {/* Text Column */}
         <motion.div
           variants={fadeUp}
-          className="order-1 md:order-2 flex flex-col justify-center text-[16px] lg:text-[18px] xl:text-[20px] px-6 pt-10 md:pt-0 md:px-0"
+          className="order-1 md:order-2 flex flex-col justify-center px-6 pt-10 md:pt-0 md:px-0"
         >
-          <h3 className="text-[28px] md:text-[32px] font-editorial leading-tight mb-6 xl:mb-12">
+          <h3 className={`font-editorial leading-tight mb-6 xl:mb-12 ${titleClassName || "text-[28px] md:text-[32px]"}`}>
             {title}
           </h3>
 
-          <div className="space-y-6 xl:space-y-10 text-[16px] xl:text-[20px] text-left">
+          <div className={`space-y-6 xl:space-y-10 text-left ${paragraphClassName || "text-[16px] xl:text-[20px]"}`}>
             {paragraphs
               ? paragraphs.map((p, idx) => (
                 <p key={idx}>{p}</p>

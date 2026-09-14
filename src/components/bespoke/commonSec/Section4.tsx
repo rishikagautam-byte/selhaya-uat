@@ -13,6 +13,9 @@ export interface Section4Props {
   className?: string;
   minHeight?: string;
   overlayClassName?: string;
+  titleClassName?: string;
+  descriptionClassName?: string;
+  taglineClassName?: string;
 }
 
 export default function Section4({
@@ -30,6 +33,9 @@ export default function Section4({
   showDivider = true,
   className = "",
   minHeight = "min-h-[500px] md:min-h-[600px] xl:h-screen",
+  titleClassName = "",
+  descriptionClassName = "",
+  taglineClassName = "",
 }: Section4Props) {
   return (
     <>
@@ -56,7 +62,7 @@ export default function Section4({
         {/* Title */}
         <motion.h2
           variants={fadeUp}
-          className="text-[26px] md:text-[32px] font-editorial leading-tight"
+          className={`font-editorial leading-tight ${titleClassName || "text-[26px] md:text-[32px]"}`}
         >
           {title}
         </motion.h2>
@@ -64,7 +70,7 @@ export default function Section4({
         {/* Description */}
         <motion.p
           variants={fadeUp}
-          className="text-[14px] md:text-[16px] text-white/90 max-w-xl mx-auto mt-4 leading-relaxed dm-sans"
+          className={`text-white/90 max-w-xl mx-auto mt-4 leading-relaxed dm-sans ${descriptionClassName || "text-[14px] md:text-[16px]"}`}
         >
           {description}
         </motion.p>
@@ -81,7 +87,7 @@ export default function Section4({
         {tagline && (
           <motion.h3
             variants={fadeUp}
-            className="text-[22px] md:text-[28px] font-editorial  italic text-white"
+            className={`font-editorial italic text-white ${taglineClassName || "text-[22px] md:text-[28px]"}`}
           >
             {tagline}
           </motion.h3>

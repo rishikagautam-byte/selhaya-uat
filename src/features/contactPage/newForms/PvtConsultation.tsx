@@ -213,18 +213,27 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
         <div className="w-full max-w-137.5 mx-auto">
 
           {/* Heading */}
-          <h3 className="text-[24px] md:text-[26px] lg:text-[30px] leading-snug mb-3">
+          <h3 className={`${silk === "art" ? "text-[20px] md:text-[22px] lg:text-[26px]" : "text-[22px] md:text-[24px] lg:text-[28px]"} leading-snug mb-3`}>
             Begin a Private Consultation
           </h3>
 
           {/* Sub-description */}
-          <p className="text-[16px] mb-5">
-            The House accepts a limited number of Bespoke Garment commissions annually. <br /><br />
-            Private consultations are arranged directly through the Maison following submission and review. Every enquiry begins with a conversation about the occasion, vision, and details that will shape the commission.
+          <p className={`${silk === "art" ? "text-[12px]" : "text-[14px]"} mb-5 leading-relaxed`}>
+            {silk === "art" ? (
+              <>
+                The House accepts a limited number of Bespoke Silk Art commissions annually. <br /><br />
+                Private consultations are arranged directly through the Maison following submission and review. Every enquiry begins with a conversation about the story, symbolism, purpose, and legacy behind the commission.
+              </>
+            ) : (
+              <>
+                The House accepts a limited number of Bespoke Garment commissions annually. <br /><br />
+                Private consultations are arranged directly through the Maison following submission and review. Every enquiry begins with a conversation about the occasion, vision, and details that will shape the commission.
+              </>
+            )}
           </p>
 
           <div className="w-full flex flex-col relative">
-            <p className="text-[16px] uppercase mb-4 font-bold tracking-wider ">
+            <p className={`${silk === "art" ? "text-[12px]" : "text-[14px]"} uppercase mb-4 font-bold tracking-wider`}>
               Enquiry Details
             </p>
 
@@ -237,7 +246,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                 onChange={handleChange}
                 placeholder="Full Name"
                 autoComplete="off"
-                className="w-full bg-transparent pb-1 pt-3.5 border-0 border-b border-[#281B1380] text-[16px] placeholder:text-[#281B1380] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300"
+                className={`w-full bg-transparent pb-1 pt-3.5 border-0 border-b border-[#281B1380] ${silk === "art" ? "text-[12px]" : "text-[14px]"} placeholder:text-[#281B1380] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300`}
               />
             </div>
 
@@ -250,7 +259,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                 onChange={handleChange}
                 placeholder="Email"
                 autoComplete="off"
-                className="w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] text-[16px] placeholder:text-[#8E7F72] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300"
+                className={`w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] ${silk === "art" ? "text-[12px]" : "text-[14px]"} placeholder:text-[#8E7F72] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300`}
               />
             </div>
 
@@ -263,7 +272,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                   setIsLocationOpen(!isLocationOpen);
                   setIsPhoneDropdownOpen(false);
                 }}
-                className="w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] text-[16px] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300 flex items-center justify-between cursor-pointer"
+                className={`w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] ${silk === "art" ? "text-[12px]" : "text-[14px]"} outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300 flex items-center justify-between cursor-pointer`}
                 style={{ border: "none", borderBottom: "1px solid rgba(40,27,19,0.5)" }}
               >
                 <span className={selectedLocation ? "" : "text-[#8E7F72]"}>
@@ -339,7 +348,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                 onChange={handleChange}
                 placeholder="Message"
                 rows={1}
-                className="w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] text-[16px] placeholder:text-[#8E7F72] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300 resize-none"
+                className={`w-full bg-transparent pb-1 pt-4 border-0 border-b border-[#281B1380] ${silk === "art" ? "text-[12px]" : "text-[14px]"} placeholder:text-[#8E7F72] outline-none focus:outline-none focus:ring-0 focus:border-[#2D1F1D] transition-all duration-300 resize-none`}
               />
             </div>
 
@@ -430,7 +439,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                 )}
               </div>
 
-              <span className="text-[16px]  shrink-0 pt-0.5">
+              <span className={`shrink-0 pt-0.5 ${silk === "art" ? "text-[12px]" : "text-[14px]"}`}>
                 +{selectedCountry.dial}
               </span>
 
@@ -445,7 +454,7 @@ const PvtConsultation = ({ silk }: { silk: "art" | "garment" }) => {
                 maxLength={15}
                 placeholder="00000 00000"
                 autoComplete="off"
-                className="w-full bg-transparent text-[16px]  placeholder:text-[#281B1380] outline-none border-0 focus:ring-0 pt-0.5"
+                className={`w-full bg-transparent ${silk === "art" ? "text-[12px]" : "text-[14px]"} placeholder:text-[#281B1380] outline-none border-0 focus:ring-0 pt-0.5`}
               />
             </div>
 
